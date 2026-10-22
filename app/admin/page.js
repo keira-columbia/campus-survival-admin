@@ -1,0 +1,18 @@
+import Link from "next/link";
+import Image from "next/image";
+import { createAdminClient } from "../../lib/supabase/admin";
+
+export const dynamic="force-dynamic";
+export default async function Dashboard(){
+  const db=createAdminClient();
+  const [{data:profiles=[]},{data:moments=[]},{data:captions=[]},{data:captionVotes=[]},{data:ratings=[]}]=await Promise.all([
+    db.from("profiles").select("id,first_name,last_name"),
+    db.from("moments").select("id,title,zone,user_id,created_at,image_url").order("created_at",{ascending:false}),
+    db.from("captions").select("id,moment_id"),db.from("caption_votes").select("id,moment_id,user_id,created_at"),db.from("moment_ratings").select("id,moment_id,user_id,value,created_at")
+  ]);
+  const engagement=captionVotes.length+ratings.length;
+  const zoneCounts=Object.entries(moments.reduce((all,m)=>({...all,[m.zone]:(all[m.zone]||0)+1}),{})).sort((a,b)=>b[1]-a[1]);
+  const activeUsers=new Set([...captionVotes.map(v=>v.user_id),...ratings.map(v=>v.user_id)]).size;
+  const top=moments.map(moment=>{const mine=ratings.filter(r=>r.moment_id===moment.id);return {...moment,score:mine.reduce((n,r)=>n+r.value,0),votes:mine.length+captionVotes.filter(v=>v.moment_id===moment.id).length};}).sort((a,b)=>b.score-a.score||b.votes-a.votes).slice(0,5);
+  return <><header className="page-head"><div><p>OPERATIONS OVERVIEW</p><h1>Community pulse</h1><span>Live statistics from the Campus Survival database.</span></div><Link className="primary" href="/admin/media/new">＋ Generate media</Link></header><section className="metrics"><article><small>PROFILES</small><b>{profiles.length}</b><em>registered accounts</em></article><article className="acid"><small>AI MEDIA</small><b>{moments.length}</b><em>{captions.length} captions generated</em></article><article><small>TOTAL SIGNALS</small><b>{engagement}</b><em>ratings + caption votes</em></article><article><small>ACTIVE VOTERS</small><b>{activeUsers}</b><em>unique participating accounts</em></article></section><section className="dash-grid"><article className="panel"><div className="panel-title"><span>ZONE DISTRIBUTION</span><small>{moments.length} TOTAL</small></div><div className="bars">{zoneCounts.map(([zone,count])=><div key={zone}><label><span>{zone}</span><b>{count}</b></label><i><u style={{width:`${Math.max(8,count/Math.max(1,moments.length)*100)}%`}}/></i></div>)}</div></article><article className="panel"><div className="panel-title"><span>ENGAGEMENT RATE</span><small>ALL TIME</small></div><div className="ring" style={{"--value":`${Math.min(100,Math.round(engagement/Math.max(1,moments.length*2)*100))}%`}}><b>{Math.round(engagement/Math.max(1,moments.length))}</b><span>actions<br/>per post</span></div></article></section><section className="panel leaderboard"><div className="panel-title"><span>TOP MEDIA</span><Link href="/admin/media">Manage all →</Link></div>{top.map((item,index)=><Link className="leader-row" href={`/admin/media/${item.id}`} key={item.id}><b>{String(index+1).padStart(2,"0")}</b><Image src={item.image_url} alt="" width={70} height={48} unoptimized/><span><strong>{item.title}</strong><small>{item.zone} · {item.votes} interactions</small></span><em>{item.score>=0?'+':''}{item.score}</em></Link>)}</section></>;
+}
