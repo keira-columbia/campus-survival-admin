@@ -5,11 +5,16 @@ import { createAdminClient } from "../../lib/supabase/admin";
 export const dynamic="force-dynamic";
 export default async function Dashboard(){
   const db=createAdminClient();
-  const [{data:profiles=[]},{data:moments=[]},{data:captions=[]},{data:captionVotes=[]},{data:ratings=[]}]=await Promise.all([
+  const [profilesResult,momentsResult,captionsResult,captionVotesResult,ratingsResult]=await Promise.all([
     db.from("profiles").select("id,first_name,last_name"),
     db.from("moments").select("id,title,zone,user_id,created_at,image_url").order("created_at",{ascending:false}),
     db.from("captions").select("id,moment_id"),db.from("caption_votes").select("id,moment_id,user_id,created_at"),db.from("moment_ratings").select("id,moment_id,user_id,value,created_at")
   ]);
+  const profiles=profilesResult.data??[];
+  const moments=momentsResult.data??[];
+  const captions=captionsResult.data??[];
+  const captionVotes=captionVotesResult.data??[];
+  const ratings=ratingsResult.data??[];
   const engagement=captionVotes.length+ratings.length;
   const zoneCounts=Object.entries(moments.reduce((all,m)=>({...all,[m.zone]:(all[m.zone]||0)+1}),{})).sort((a,b)=>b[1]-a[1]);
   const activeUsers=new Set([...captionVotes.map(v=>v.user_id),...ratings.map(v=>v.user_id)]).size;
